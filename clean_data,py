@@ -1,0 +1,35 @@
+import pandas as pd
+import jiwer
+import re
+
+# 1. Baca data mentah yang baru saja selesai diproses
+df = pd.read_csv("ocr_results.csv")
+
+def clean_tax_date(text):
+    text = str(text)
+    # Menghapus kata halusinasi AI (jika AI memunculkan kata THEIMAGE atau huruf berulang parah)
+    if "IMAGE" in text or len(set(text)) == 1: 
+        return ""
+    
+    # Menghapus 2 hingga 4 angka di ujung kanan (memotong sisa tanggal pajak)
+    cleaned = re.sub(r'\d{2,4}$', '', text)
+    return cleaned
+
+# 2. Buat kolom prediksi baru yang sudah bersih
+df['cleaned_prediction'] = df['prediction'].apply(clean_tax_date)
+
+# 3. Hitung ulang skor CER berdasarkan data yang sudah dibersihkan
+df['final_CER'] = df.apply(lambda row: jiwer.cer(str(row['ground_truth']), str(row['cleaned_prediction'])), axis=1)
+
+# 4. Tampilkan 10 data pertama sebagai perbandingan
+print(df[['ground_truth', 'prediction', 'cleaned_prediction', 'final_CER']].head(10))
+
+# 5. Hitung rata-rata error untuk dilaporkan di UAS
+rata_rata_cer = df['final_CER'].mean()
+print("\n" + "="*50)
+print(f"Rata-rata Error (CER) Keseluruhan: {rata_rata_cer:.2f}")
+print("="*50)
+
+# 6. Simpan hasil akhir
+df.to_csv("ocr_final_report.csv", index=False)
+print("\nSelesai! Data bersih berhasil disimpan ke 'ocr_final_report.csv'")
